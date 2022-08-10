@@ -1,0 +1,3 @@
+/// versioning
+#define serial2UDP_VERSION_MAJOR @serial2UDP_VERSION_MAJOR@
+#define serial2UDP_VERSION_MINOR @serial2UDP_VERSION_MINOR@
