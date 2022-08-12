@@ -14,5 +14,6 @@ int main(int argc, char* argv[]) {
 
     std::cout << "Starting serial2UDP\n" << "------------\n";
     UART_to_USB.start();
+    std::cout << "Exiting serial2UDP\n" << "------------\n";
     return 0;
 }
