@@ -111,12 +111,12 @@ void serial_port::start() {
                 //std::this_thread::sleep_for(std::chrono::nanoseconds(serial_port_object->nanosec_in_ms*10UL));
 
                 if(tcdrain(serial_port_object->serial_port_fd_) == -1) {
-                    std::cout << "[Error] Tx not finished" << errno << std::endl;
+                    std::cerr << "[Error] Tx not finished" << errno << std::endl;
                 }
 
                 pthread_mutex_unlock(&serial_port_object->mtx);
             } else {
-                std::cout << "[Error] Wrong command requested\n";
+                std::cerr << "[Error] Wrong command requested\n";
             }
         }
     };
@@ -124,16 +124,8 @@ void serial_port::start() {
     auto serial_comms_loop = [](serial_port* serial_port_object) {
         int num_bytes;
         int sig = 0;
-        /*struct timespec period = {0, nanosec_in_ms*10UL};
-        struct timespec activate_time;
-        int err = clock_gettime(CLOCK_MONOTONIC, &activate_time);*/
 
         while(serial_port_object->keep_running) {
-            /// wait until activation time
-/*            do {
-                err = clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &activate_time, NULL);
-            } while ((err != 0) && (errno == EINTR));*/
-
             /// process rx
             pthread_mutex_lock(&serial_port_object->mtx);
 
@@ -159,24 +151,14 @@ void serial_port::start() {
                     std::cout << "[RX] Data(11) = " << std::hex << static_cast<int>(serial_port_object->read_buffer_[11] & 0x7F) << std::endl;
                 } else {
                     if(tcflush(serial_port_object->serial_port_fd_, TCIFLUSH) != 0) {
-                        std::cerr << "TCIflush error\n";
+                        std::cerr << "Rx queue cannot flush\n";
                     }
                 }
-
             }
             pthread_mutex_unlock(&serial_port_object->mtx);
-            std::this_thread::sleep_for(std::chrono::nanoseconds(serial_port_object->nanosec_in_ms*90UL));
 
-            /// add waiting time until next activation
-/*            if (activate_time.tv_nsec + period.tv_nsec > nanosec_in_s) {
-                activate_time.tv_sec += 1UL;
-                activate_time.tv_nsec += period.tv_nsec;
-                activate_time.tv_nsec -= nanosec_in_s;
-            } else {
-                activate_time.tv_nsec += period.tv_nsec;
-            }*/
-            //i++;
-            //std::this_thread::sleep_for(std::chrono::nanoseconds(nanosec_in_ms*9UL));
+            /// \todo timer could be more precise to safe CPU time
+            std::this_thread::sleep_for(std::chrono::nanoseconds(serial_port_object->nanosec_in_ms*90UL));
         }
     };
 
