@@ -23,7 +23,7 @@ serial_port::serial_port(std::string port_name = "/dev/ttyUSB0")
     /// open serial port file descriptor
     serial_port_fd_ = open(port_name_.c_str(), O_RDWR | O_NONBLOCK | O_NOCTTY);
     if (serial_port_fd_ < 0) {
-        printf("Error %i from open: %s\n", errno, strerror(errno));
+        std::cerr << "[Error] " << errno << " from open: " << strerror(errno) << std::endl;
     }
 
     /// lock the port
@@ -34,7 +34,7 @@ serial_port::serial_port(std::string port_name = "/dev/ttyUSB0")
     /// start configuring serial port
     struct termios tty_usb;
     if(tcgetattr(serial_port_fd_, &tty_usb) != 0) {
-        printf("Error %i from tcgetattr: %s\n", errno, strerror(errno));
+        std::cerr << "[Error] " << errno << " from tcgetattr: " << strerror(errno) << std::endl;
     }
 
     /// set UART configuration
@@ -45,7 +45,6 @@ serial_port::serial_port(std::string port_name = "/dev/ttyUSB0")
 
     tty_usb.c_cflag &= ~CRTSCTS;
     tty_usb.c_iflag &= ~(IXON | IXOFF | IXANY);
-
     tty_usb.c_cflag |= CREAD | CLOCAL;
 
     /// non-canonical mode
@@ -70,7 +69,7 @@ serial_port::serial_port(std::string port_name = "/dev/ttyUSB0")
 
     /// set serial port configuration
     if (tcsetattr(serial_port_fd_, TCSANOW, &tty_usb) != 0) {
-        printf("Error %i from tcsetattr: %s\n", errno, strerror(errno));
+        std::cerr << "[Error] " << errno << " from tcsetattr: " << strerror(errno) << std::endl;
     }
 
     /// register SIGINT
@@ -125,7 +124,7 @@ void serial_port::exchange_data(void) {
         ptv = NULL;
         FD_ZERO(&rdset);
         FD_ZERO(&wrset);
-        
+
         FD_SET(serial_port_fd_, &rdset);
 
         if(cmd_to_send) {
@@ -137,46 +136,43 @@ void serial_port::exchange_data(void) {
             if ( errno == EINTR )
                 continue;
             else {
-                printf("select failed: %d : %s\n", errno, strerror(errno));
+                std::cerr << "[Error] select failed " << errno << " " << strerror(errno) << std::endl;
             }
 
         } else if ( r == 0 ) {
-            std::cerr << "Timeout!\n";
+            std::cerr << "[Error] timeout!\n";
         }
 
 
+        /// reception
         if ( FD_ISSET(serial_port_fd_, &rdset) ) {
-            /// read from port
+            /// read from port byte by byte
             volatile int i =0;
             do {
                 n = read(serial_port_fd_, &read_buffer_[i], 1);
-                std::cout << std::dec << i << ": n[" << n << "] = " << std::hex << static_cast<int>(read_buffer_[i] & 0x7F) << std::endl;
                 i++;
             } while (n != 0 && errno != EINTR);
-            if (n == 0) {
-                //fatal("read zero bytes from port");
-                //std::cerr << "read zero bytes from port\n";
-            } else if ( n < 0 ) {
+            if ( n < 0 ) {
                 if ( errno != EAGAIN && errno != EWOULDBLOCK )
-                    std::cerr << "read from port failed: " << strerror(errno) << std::endl;
+                    std::cerr << "[Error] read from port failed: " << strerror(errno) << std::endl;
             } else {
                 print_rx_data();
             }
+
             if (read_buffer_[0] != 0x2A) {
-                std::cerr << "Wrong init character\n";
+                std::cerr << "[Error] wrong init character\n";
+            } else {
+                /// send data in JSON over UDP
+                (void)read_buffer_;
             }
         }
 
+        /// transmission
         if ( FD_ISSET(serial_port_fd_, &wrset) ) {
-            //volatile int i = 0;
-            //for (i = 0; i < 10; i++) {
-                n = write(serial_port_fd_, curr_cmd, 2);
-             //   std::cout << std::dec << i << ": write[" << n << "]\n";
-           // }
+            /// write command over port
+            n = write(serial_port_fd_, curr_cmd, 2);
             if ( n <= 0 ) {
-                std::cerr << "write to port failed: " << strerror(errno) << std::endl;
-            } else {
-                std::cout << "characters sent: " << std::dec << n << std::endl;
+                std::cerr << "[Error] write to port failed: " << strerror(errno) << std::endl;
             }
             cmd_to_send = false;
         }
