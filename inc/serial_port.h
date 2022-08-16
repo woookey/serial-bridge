@@ -5,6 +5,7 @@
 #include <map>
 #include <vector>
 #include <pthread.h>
+#include <thread>
 
 namespace serial2UDP {
 
@@ -13,7 +14,7 @@ private:
     std::string port_name_{nullptr};
     int serial_port_fd_{0};
     bool keep_running{false};
-    bool cmd_to_sent{false};
+    bool cmd_to_send{false};
     char curr_cmd[100];
     bool port_lock{false};
 
@@ -28,6 +29,9 @@ private:
 
     pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
 
+    std::thread read_cmd_thread;
+    std::thread exchange_data_thread;
+
     /// commands map is filled during initialisation
     std::map<std::string, std::vector<uint8_t>> cmd_storage();
 public:
@@ -35,6 +39,14 @@ public:
     serial_port(std::string port_name);
     ~serial_port();
     void start();
+
+    /// threads
+    void read_commands(void);
+    void exchange_data(void);
+
+    void print_rx_data(void);
+
+
 };
 
 }
