@@ -1,5 +1,5 @@
-#ifndef SERIAL_PORT_H
-#define SERIAL_PORT_H
+#ifndef serial_bridge_H
+#define serial_bridge_H
 
 #include <string>
 #include <map>
@@ -12,7 +12,7 @@
 #include <nlohmann/json.hpp>
 using json = nlohmann::json;
 
-namespace serial2UDP {
+namespace serial_bridge {
 
 typedef enum : uint32_t {
     BITS_7 = CS7,
@@ -43,12 +43,12 @@ typedef enum : uint32_t {
     BAUDRATE_4000000 = B4000000,
 } baudrate_t;
 
-class serial_port {
+class serial_bridge {
 private:
     #define ARRAY_MAX_LENGTH 20
     /// serial port data
     std::string port_name_{nullptr};
-    int serial_port_fd_{0};
+    int serial_bridge_fd_{0};
     bool keep_running{false};
     bool cmd_to_send{false};
     char curr_cmd[100];
@@ -88,9 +88,9 @@ private:
 
 public:
     static void signal_handler(int signum);
-    serial_port(std::string port_name);
-    serial_port(std::string port_name, data_bits_t data_bits, parity_t parity, baudrate_t baudrate);
-    ~serial_port();
+    serial_bridge(std::string port_name);
+    serial_bridge(std::string port_name, data_bits_t data_bits, parity_t parity, baudrate_t baudrate);
+    ~serial_bridge();
     void start();
 
     bool is_initialised(void) {return init;}
