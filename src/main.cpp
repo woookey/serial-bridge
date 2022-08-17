@@ -1,21 +1,21 @@
 #include <iostream>
-#include "serial2UDP.h"
-#include "serial_port.h"
+#include <serial2UDP.h>
+#include <serial_port.h>
+#include <memory>
 
 int main(int argc, char* argv[]) {
+    (void)argc;
     (void)argv;
-    if (argc < 2) {
-        std::cout << "serial2UDP Version " << serial2UDP_VERSION_MAJOR << "."
-        << serial2UDP_VERSION_MINOR << std::endl;
+    std::cout << "serial-bridge version " << serial2UDP_VERSION_MAJOR << "."
+    << serial2UDP_VERSION_MINOR << std::endl << "------------" << std::endl;
+
+    /// create serial-bridge instance
+    std::unique_ptr<serial2UDP::serial_port> uart_to_json =
+        std::make_unique<serial2UDP::serial_port>("/dev/ttyUSB0", serial2UDP::BITS_7,
+                                                  serial2UDP::PARITY_ODD, serial2UDP::BAUDRATE_115200);
+    /// run if initialised successfully
+    if (uart_to_json->is_initialised()) {
+        uart_to_json->start();
     }
-
-    std::string port_name = "/dev/ttyUSB0";
-    serial2UDP::serial_port UART_to_USB(port_name);
-
-    if (UART_to_USB.is_initialised()) {
-        UART_to_USB.start();
-    }
-
-    std::cout << "Exiting serial2UDP\n" << "------------\n";
     return 0;
 }
