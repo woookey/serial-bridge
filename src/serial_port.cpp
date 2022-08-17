@@ -1,4 +1,4 @@
-#include "serial_port.h"
+#include <serial_port.h>
 
 #include <termios.h>
 #include <fcntl.h>
@@ -8,6 +8,10 @@
 #include <sys/file.h>
 #include <sys/ioctl.h>
 #include <sys/select.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+
 #include <string.h>
 #include <stdio.h>
 #include <csignal>
@@ -18,22 +22,28 @@ namespace serial2UDP {
 
 serial_port::serial_port(std::string port_name = "/dev/ttyUSB0")
     : port_name_(port_name) {
+    /// initialise variables
+    init = true;
     memset(&read_buffer_, 0, sizeof(read_buffer_));
     memset(&write_buffer_, 0, sizeof(write_buffer_));
+    data_bits = BITS_7;
     /// open serial port file descriptor
     serial_port_fd_ = open(port_name_.c_str(), O_RDWR | O_NONBLOCK | O_NOCTTY);
     if (serial_port_fd_ < 0) {
+        init = false;
         std::cerr << "[Error] " << errno << " from open: " << strerror(errno) << std::endl;
     }
 
     /// lock the port
     if (flock(serial_port_fd_, LOCK_EX | LOCK_NB) == -1) {
+        init = false;
         std::cerr << "[Error] Failed to lock the file!\n";
     }
 
     /// start configuring serial port
     struct termios tty_usb;
     if(tcgetattr(serial_port_fd_, &tty_usb) != 0) {
+        init = false;
         std::cerr << "[Error] " << errno << " from tcgetattr: " << strerror(errno) << std::endl;
     }
 
@@ -41,6 +51,8 @@ serial_port::serial_port(std::string port_name = "/dev/ttyUSB0")
     cfmakeraw(&tty_usb);
     tty_usb.c_cflag &= ~PARENB;
     tty_usb.c_cflag &= ~CSTOPB;
+
+
     tty_usb.c_cflag |= CS7;
 
     tty_usb.c_cflag &= ~CRTSCTS;
@@ -69,19 +81,28 @@ serial_port::serial_port(std::string port_name = "/dev/ttyUSB0")
 
     /// set serial port configuration
     if (tcsetattr(serial_port_fd_, TCSANOW, &tty_usb) != 0) {
+        init = false;
         std::cerr << "[Error] " << errno << " from tcsetattr: " << strerror(errno) << std::endl;
     }
 
     /// register SIGINT
     signal(SIGINT, signal_handler);
+
+    /// set UDP socket
+    sock = ::socket(AF_INET, SOCK_DGRAM, 0);
+    destination.sin_family = AF_INET;
+    destination.sin_port = htons(udp_port);
+    destination.sin_addr.s_addr = inet_addr(udp_hostname.c_str());
 }
 
 serial_port::~serial_port() {
-    std::cout << "Closing serial_port " << port_name_ << std::endl;
+    std::cout << "Closing serial_bridge " << port_name_ << std::endl;
     close(serial_port_fd_);
+    close(sock);
 }
 
 void serial_port::start() {
+    std::cout << "Starting serial-bridge!\n" << "------------\n";
     keep_running = true;
 
     /// run threads
@@ -117,6 +138,13 @@ void serial_port::exchange_data(void) {
     fd_set rdset, wrset;
     int r, n;
     int sig_read;
+    /// define json telemetry
+    static json telemetry = {
+        {"uid", 0},
+        {"cookie", 0},
+        {"cpu_temp", 0.0},
+        {"switch_on", false},
+    };
 
     while (keep_running) {
         struct timeval tv, *ptv;
@@ -155,15 +183,22 @@ void serial_port::exchange_data(void) {
             if ( n < 0 ) {
                 if ( errno != EAGAIN && errno != EWOULDBLOCK )
                     std::cerr << "[Error] read from port failed: " << strerror(errno) << std::endl;
-            } else {
+            }/* else {
                 print_rx_data();
-            }
+            }*/
 
-            if (read_buffer_[0] != 0x2A) {
+            if (static_cast<int>(read_buffer_[0]) != uid) {
                 std::cerr << "[Error] wrong init character\n";
             } else {
-                /// send data in JSON over UDP
-                (void)read_buffer_;
+                /// update telemetry in JSON format
+                update_telemetry_in_json(telemetry);
+
+                std::string telemetry_string = telemetry.dump();
+                std::cout << telemetry_string << std::endl;
+
+                /// send JSON over UDP
+                int n_bytes = ::sendto(sock, telemetry_string.c_str(), telemetry_string.length(), 0, reinterpret_cast<sockaddr*>(&destination), sizeof(destination));
+                std::cout << n_bytes << " bytes sent" << std::endl;
             }
         }
 
@@ -179,19 +214,24 @@ void serial_port::exchange_data(void) {
     }
 }
 
-void serial_port::print_rx_data(void) {
-    std::cout << "[RX] Data(0) = " << std::hex << static_cast<int>(read_buffer_[0] & 0x7F) << std::endl;
-    std::cout << "[RX] Data(1) = " << std::hex << static_cast<int>(read_buffer_[1] & 0x7F) << std::endl;
-    std::cout << "[RX] Data(2) = " << std::hex << static_cast<int>(read_buffer_[2] & 0x7F) << std::endl;
-    std::cout << "[RX] Data(3) = " << std::hex << static_cast<int>(read_buffer_[3] & 0x7F) << std::endl;
-    std::cout << "[RX] Data(4) = " << std::hex << static_cast<int>(read_buffer_[4] & 0x7F) << std::endl;
-    std::cout << "[RX] Data(5) = " << std::hex << static_cast<int>(read_buffer_[5] & 0x7F) << std::endl;
-    std::cout << "[RX] Data(6) = " << std::hex << static_cast<int>(read_buffer_[6] & 0x7F) << std::endl;
-    std::cout << "[RX] Data(7) = " << std::hex << static_cast<int>(read_buffer_[7] & 0x7F) << std::endl;
-    std::cout << "[RX] Data(8) = " << std::hex << static_cast<int>(read_buffer_[8] & 0x7F) << std::endl;
-    std::cout << "[RX] Data(9) = " << std::hex << static_cast<int>(read_buffer_[9] & 0x7F) << std::endl;
-    std::cout << "[RX] Data(10) = " << std::hex << static_cast<int>(read_buffer_[10] & 0x7F) << std::endl;
-    std::cout << "[RX] Data(11) = " << std::hex << static_cast<int>(read_buffer_[11] & 0x7F) << std::endl;
+void serial_port::update_telemetry_in_json(json& telemetry) {
+    if (data_bits == BITS_7) {
+        telemetry["uid"] = static_cast<int>(read_buffer_[0] & 0x7F);
+        telemetry["cookie"] = static_cast<int>((read_buffer_[4] & 0x7F) | ((read_buffer_[5] & 0x7F) << 8)
+                | ((read_buffer_[6] & 0x7F) << 16) | ((read_buffer_[7] & 0x7F) << 24));
+        telemetry["cpu_temp"] = static_cast<int>((read_buffer_[8] & 0x7F) | (read_buffer_[9] & 0x7F) << 8);
+        telemetry["switch_on"] = static_cast<int>(read_buffer_[10] & 0x7F);
+    } else if (data_bits == BITS_8) {
+        telemetry["uid"] = static_cast<int>(read_buffer_[0]);
+        telemetry["cookie"] = static_cast<int>((read_buffer_[4]) | (read_buffer_[5] << 8)
+                | (read_buffer_[6] << 16) | (read_buffer_[7] << 24));
+        telemetry["cpu_temp"] = static_cast<int>((read_buffer_[8]) | (read_buffer_[9] << 8));
+        telemetry["switch_on"] = static_cast<int>(read_buffer_[10]);
+
+    } else {
+        std::cerr << "[Error] " << data_bits << " data bits is not supported!\n";
+    }
+
 }
 
 }

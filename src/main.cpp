@@ -12,8 +12,10 @@ int main(int argc, char* argv[]) {
     std::string port_name = "/dev/ttyUSB0";
     serial2UDP::serial_port UART_to_USB(port_name);
 
-    std::cout << "Starting serial2UDP\n" << "------------\n";
-    UART_to_USB.start();
+    if (UART_to_USB.is_initialised()) {
+        UART_to_USB.start();
+    }
+
     std::cout << "Exiting serial2UDP\n" << "------------\n";
     return 0;
 }
