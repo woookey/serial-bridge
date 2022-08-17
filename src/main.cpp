@@ -11,8 +11,8 @@ int main(int argc, char* argv[]) {
 
     /// create serial-bridge instance
     std::unique_ptr<serial2UDP::serial_port> uart_to_json =
-        std::make_unique<serial2UDP::serial_port>("/dev/ttyUSB0", serial2UDP::BITS_7,
-                                                  serial2UDP::PARITY_ODD, serial2UDP::BAUDRATE_115200);
+        std::make_unique<serial2UDP::serial_port>("/dev/ttyUSB0", serial2UDP::BITS_8,
+                                                  serial2UDP::PARITY_NONE, serial2UDP::BAUDRATE_115200);
     /// run if initialised successfully
     if (uart_to_json->is_initialised()) {
         uart_to_json->start();

@@ -45,6 +45,7 @@ typedef enum : uint32_t {
 
 class serial_port {
 private:
+    #define ARRAY_MAX_LENGTH 20
     /// serial port data
     std::string port_name_{nullptr};
     int serial_port_fd_{0};
@@ -64,9 +65,8 @@ private:
 
     const int READ_SIZE{12};
     const int WRITE_SIZE{2};
-
-    uint8_t read_buffer_[12];
-    uint8_t write_buffer_[2];
+    uint8_t read_buffer_[ARRAY_MAX_LENGTH];
+    uint8_t write_buffer_[ARRAY_MAX_LENGTH];
 
     pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
 
