@@ -263,7 +263,6 @@ void serial_bridge::read_commands(void) {
 void serial_bridge::exchange_data(void) {
     fd_set rdset, wrset;
     int r, n;
-    int sig_read;
     /// define json telemetry
     static json telemetry = {
         {"uid", 0},
@@ -272,7 +271,7 @@ void serial_bridge::exchange_data(void) {
     };
 
     while (keep_running) {
-        struct timeval tv, *ptv;
+        struct timeval *ptv;
 
         ptv = NULL;
         FD_ZERO(&rdset);
