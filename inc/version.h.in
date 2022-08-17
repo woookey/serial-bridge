@@ -1,0 +1,3 @@
+/// versioning
+#define serial_bridge_VERSION_MAJOR @serial_bridge_VERSION_MAJOR@
+#define serial_bridge_VERSION_MINOR @serial_bridge_VERSION_MINOR@
