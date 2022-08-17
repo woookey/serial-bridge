@@ -11,3 +11,5 @@ target_include_directories(serial_bridge PUBLIC
         ${CMAKE_SOURCE_DIR}/inc
         ${CMAKE_SOURCE_DIR}/3rdparty
 )
+
+install(TARGETS serial_bridge DESTINATION ${PROJECT_BINARY_DIR}/bin)
